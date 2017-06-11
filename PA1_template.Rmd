@@ -8,18 +8,122 @@ output:
 
 ## Loading and preprocessing the data
 
+```{r}
+# load the packages used
+require(lubridate)
+require(data.table)
 
+unzip("activity.zip")
+
+data = read.csv("activity.csv")
+data$date = ymd(data$date) # convert the date to a data class
+
+```
 
 ## What is mean total number of steps taken per day?
 
+What is the total number of steps per day, with the days:
+
+```{r}
+tapply(data$steps,data$date,sum, na.omit = TRUE)
+```
 
 
-## What is the average daily activity pattern?
+Plot a histogram of the number of steps (i.e. distribution)
+```{r}
+hist(tapply(data$steps,data$date,sum, na.omit = TRUE),xlab = "Num Steps", main = "Histogram of total number of steps per day")
+```
 
+What is the mean number of steps per day?
+```{r}
+mean_steps = mean(tapply(data$steps,data$date,sum, na.rm = TRUE), na.rm = TRUE)
+```
+
+The mean number of steps per day is: `r mean_steps`
+
+what is the median number of steps per day?
+```{r}
+median_steps = median(tapply(data$steps,data$date,sum, na.rm = TRUE), na.rm = TRUE)
+```
+
+The median number of steps per day is: `r median_steps`
+
+What is the average daily activity pattern?
+```{r}
+plot(tapply(data$steps, data$interval, mean, na.rm = TRUE), type = 'l', ylab = "Number of Steps", xlab = "Interval")
+```
+
+Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+The full interval with the maximum number of steps can be found using which.max as follows:
+```{r, echo = TRUE}
+data[which.max(data$steps),]
+```
 
 
 ## Imputing missing values
 
+What is the total number of missing data?
+```{r}
+sum(!complete.cases(data))
+```
 
+
+Devise a strategy for filling in the missing values:
+1. Create a mean data frame
+2. Iterate through the existing data frame, replacing NA values with the mean values
+
+```{r}
+interval_steps <- aggregate(steps ~ interval, data, mean)
+for (i in 1:nrow(data)){
+  if (is.na(data$steps[i])){
+    interval_val <- data$interval[i]
+    row_id <- which(interval_steps$interval == interval_val)
+    steps_val <- interval_steps$steps[row_id]
+    data$steps[i] <- steps_val
+  }
+}
+```
+
+the impact of this is:
+```{r}
+new_median_steps = median(tapply(data$steps,data$date,sum, na.rm = TRUE), na.rm = TRUE)
+new_mean_steps = mean(tapply(data$steps,data$date,sum, na.rm = TRUE), na.rm = TRUE)
+```
+
+The old mean: `r mean_steps`  
+The old median: `r median_steps`  
+
+The new mean: `r new_mean_steps`  
+the new median: `r new_median_steps`  
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Create a new factor weekday vs weekend:
+
+```{r}
+day_of_week = 1:nrow(data)
+data$day = wday(data$date)
+
+ for (i in 1:nrow(data)){
+  if (data[i,4] == 1 | data[i,4] == 7){
+    day_of_week[i] = "Weekend"
+  } else { day_of_week[i] = "weekday"}
+}
+data$day_of_week = day_of_week
+data$day_of_week = factor(data$day_of_week)
+stepsByDay <- aggregate(steps ~ interval + day_of_week, data = data, mean)
+names(stepsByDay) <- c("interval", "day_of_week", "steps")
+
+summary(stepsByDay)
+head(stepsByDay)
+
+```
+
+
+Plot the data by weekend vs weekday:
+
+```{r}
+require(lattice)
+xyplot(steps ~ interval | day_of_week, stepsByDay, type = "l")
+```
